@@ -14,7 +14,7 @@ contract Trust {
 
 	bool public revocable;      // Can the trustor revoke the trust?
 
-	uint public expiration;    // Number of blocks until trust expires
+	uint public expiration;    // Trust expires time
 
 	uint public trustBalance;    // Amount of WEI intended for beneficiary
 
@@ -27,13 +27,13 @@ contract Trust {
 	// @param (address) _trustor = The address that is depositing ETH for the _beneficiary
 	// @param (address) _beneficiary = The ETH address of who is to receive the trustBalance
 	// @param (bool) _revocable = Can the trustor revoke the contract at any point before the expiration?
-	// @param (uint) _expiration = Number of blocks until the trust is redeemable (in Ethereum blocks)
+	// @param (uint) _expiration = Time of blocks until the trust is redeemable (in Ethereum blocks)
 	constructor(address _trustor, address _beneficiary, bool _revocable, uint _expiration)
 	public {
 		trustor = _trustor;
 		beneficiary = _beneficiary;
 		revocable = _revocable;
-		expiration = block.number.add(_expiration);
+		expiration = _expiration;
 	}
 
 	// @notice (payable) trustor can deposit WEI here once
@@ -41,7 +41,7 @@ contract Trust {
 	function depositTrust()
 	external
 	lessThan(0, msg.value)
-	lessThan(block.number, expiration)
+	lessThan(block.timestamp, expiration)
 	payable {
 		require(!alreadyDeposited);
 		alreadyDeposited = true;
@@ -52,7 +52,7 @@ contract Trust {
 	// @notice trustor can revoke the contract if revocable == true
 	function revoke()
 	external
-	lessThan(block.number, expiration)
+	lessThan(block.timestamp, expiration)
 	onlySender(trustor)
 	isRevocable {
 		emit LogTrustRevoked(msg.sender, trustBalance);
@@ -63,7 +63,7 @@ contract Trust {
 	// @notice _beneficiary can withdraw trustBalance once expiration is reached
 	function withdraw()
 	external
-	lessThan(expiration, block.number)
+	lessThan(expiration, block.timestamp)
 	onlySender(beneficiary)
 	returns (bool) {
 		require(trustBalance > 0);
@@ -74,16 +74,16 @@ contract Trust {
 		return true;
 	}
 
-	// @notice this allows the expiration of the trust to be changed to _numBlocks from block.number
-	// @param (uint) _numBlocks = Trust will expire in _numBlocks
-	function changeExpiration(uint _numBlocks) //Note: This should throw if change is a negative number
+	// @notice this allows the expiration of the trust to be changed to timestamp from block
+	// @param (uint) _expiration = Trust will expire in _expiration
+	function changeExpiration(uint _expiration) //Note: This should throw if change is a negative
 	external
-	lessThan(block.number, expiration)
+	lessThan(block.timestamp, expiration)
 	onlySender(trustor)
 	isRevocable
 	returns (bool){
 		uint oldExpiration = expiration;
-		expiration = block.number.add(_numBlocks);
+		expiration = _expiration;
 		emit LogExpirationChanged(oldExpiration, expiration);
 		return true;
 	}
@@ -92,7 +92,7 @@ contract Trust {
 	// @param (address) _beneficiary = the address of the user to receive the Trust
 	function changeBeneficiary(address _beneficiary)
 	external
-	lessThan(block.number, expiration)
+	lessThan(block.timestamp, expiration)
 	onlySender(trustor)
 	isRevocable
 	returns (bool){
@@ -118,8 +118,8 @@ contract Trust {
 	external
 	view
 	returns (uint) {
-		if (expiration < block.number) { return 0; }
-		return expiration.sub(block.number);
+		if (expiration < block.timestamp) { return 0; }
+		return expiration.sub(block.timestamp);
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
